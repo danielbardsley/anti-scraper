@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proof-of-Work Demo</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="card hero-card">
+        <h1>Adaptive Proof-of-Work Demo</h1>
+        <p>
+          This page fetches a challenge, solves the proof-of-work in your browser, and then calls the
+          protected random-number endpoint.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card form-card">
+          <h2>Request</h2>
+          <label for="client-id">Client ID</label>
+          <input id="client-id" type="text" />
+
+          <label for="count">Random number count</label>
+          <input id="count" type="number" min="1" step="1" />
+
+          <button id="fetch-button" type="button">Solve challenge and fetch numbers</button>
+
+          <div class="small-print">
+            Difficulty increases every 10 successful requests within a rolling 10-minute window for the same client ID.
+          </div>
+        </article>
+
+        <article class="card status-card">
+          <h2>Status</h2>
+          <div id="status">Idle.</div>
+          <dl class="metrics">
+            <div><dt>Tier</dt><dd id="tier">-</dd></div>
+            <div><dt>Stages</dt><dd id="stages">-</dd></div>
+            <div><dt>Solve time</dt><dd id="solve-time">-</dd></div>
+            <div><dt>Request count</dt><dd id="request-count">-</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card response-card">
+          <h2>Response</h2>
+          <pre id="response-output">No response yet.</pre>
+        </article>
+
+        <article class="card response-card">
+          <h2>Challenge</h2>
+          <pre id="challenge-output">No challenge yet.</pre>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js?v=2"></script>
+  </body>
+</html>
