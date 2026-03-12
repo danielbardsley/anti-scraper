@@ -20,7 +20,8 @@ class ApplicationContainer:
         self.challenge_store = ChallengeStore(settings)
         self.session_store = SessionStore(settings)
         self.request_canonicalizer = RequestCanonicalizer()
-        self.success_tracker = SlidingWindowTracker(settings.success_window_seconds)
+        self.session_success_tracker = SlidingWindowTracker(settings.success_window_seconds)
+        self.source_success_tracker = SlidingWindowTracker(settings.success_window_seconds)
         self.challenge_rate_limiter = ChallengeRateLimiter(settings)
         self.difficulty_policy = DifficultyPolicy(settings)
         self.client_ip_resolver = ClientIpResolver(settings)
@@ -29,7 +30,8 @@ class ApplicationContainer:
             settings=settings,
             challenge_store=self.challenge_store,
             difficulty_policy=self.difficulty_policy,
-            success_tracker=self.success_tracker,
+            session_success_tracker=self.session_success_tracker,
+            source_success_tracker=self.source_success_tracker,
             request_canonicalizer=self.request_canonicalizer,
             rate_limiter=self.challenge_rate_limiter,
         )
@@ -38,6 +40,7 @@ class ApplicationContainer:
             challenge_store=self.challenge_store,
             request_canonicalizer=self.request_canonicalizer,
             difficulty_policy=self.difficulty_policy,
-            success_tracker=self.success_tracker,
+            session_success_tracker=self.session_success_tracker,
+            source_success_tracker=self.source_success_tracker,
         )
         self.random_number_service = RandomNumberService()

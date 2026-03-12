@@ -9,6 +9,18 @@ class DifficultyPolicy:
 
     def build_for_recent_successes(self, recent_successes: int) -> tuple[int, list[int]]:
         tier = recent_successes // self._settings.requests_per_tier
+        return self._build_for_tier(tier)
+
+    def build_for_session_and_source_successes(
+        self,
+        session_recent_successes: int,
+        source_recent_successes: int,
+    ) -> tuple[int, list[int]]:
+        session_tier = session_recent_successes // self._settings.requests_per_tier
+        source_tier = source_recent_successes // self._settings.source_requests_per_tier
+        return self._build_for_tier(max(session_tier, source_tier))
+
+    def _build_for_tier(self, tier: int) -> tuple[int, list[int]]:
         base_target_bits = self._settings.base_target_bits + (tier * self._settings.tier_target_increment)
         stage_count = tier + 1
         stage_target_bits = [

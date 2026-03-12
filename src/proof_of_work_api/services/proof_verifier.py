@@ -19,15 +19,17 @@ class ProofVerifier:
         challenge_store: ChallengeStore,
         request_canonicalizer: RequestCanonicalizer,
         difficulty_policy: DifficultyPolicy,
-        success_tracker: SlidingWindowTracker,
+        session_success_tracker: SlidingWindowTracker,
+        source_success_tracker: SlidingWindowTracker,
     ) -> None:
         self._settings = settings
         self._challenge_store = challenge_store
         self._request_canonicalizer = request_canonicalizer
         self._difficulty_policy = difficulty_policy
-        self._success_tracker = success_tracker
+        self._session_success_tracker = session_success_tracker
+        self._source_success_tracker = source_success_tracker
 
-    def verify_and_consume(self, request: RandomNumbersRequest, session_id: str) -> dict:
+    def verify_and_consume(self, request: RandomNumbersRequest, session_id: str, source_key: str) -> dict:
         count = request.count or self._settings.default_random_count
         self._validate_count(count)
 
@@ -49,8 +51,12 @@ class ProofVerifier:
         if challenge.request_hash != request_hash:
             raise ApiError(401, "REQUEST_BINDING_MISMATCH", "Proof is not valid for this request body.")
 
-        current_recent_successes = self._success_tracker.count(session_id, current_time)
-        current_required_tier, current_stage_targets = self._difficulty_policy.build_for_recent_successes(current_recent_successes)
+        current_session_successes = self._session_success_tracker.count(session_id, current_time)
+        current_source_successes = self._source_success_tracker.count(source_key, current_time)
+        current_required_tier, current_stage_targets = self._difficulty_policy.build_for_session_and_source_successes(
+            current_session_successes,
+            current_source_successes,
+        )
         if challenge.tier < current_required_tier or challenge.stage_target_bits != current_stage_targets:
             raise ApiError(409, "STALE_CHALLENGE_DIFFICULTY", "Challenge difficulty is now below the current required tier.")
 
@@ -80,6 +86,7 @@ class ProofVerifier:
             "tier": challenge.tier,
             "stages": len(challenge.stage_target_bits),
             "sessionId": session_id,
+            "sourceKey": source_key,
         }
 
     def _validate_count(self, count: int) -> None:

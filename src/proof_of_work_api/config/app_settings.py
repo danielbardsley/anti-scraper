@@ -7,6 +7,7 @@ from pathlib import Path
 class AppSettings:
     def __init__(self) -> None:
         self.requests_per_tier = int(os.getenv("POW_REQUESTS_PER_TIER", "10"))
+        self.source_requests_per_tier = int(os.getenv("POW_SOURCE_REQUESTS_PER_TIER", "20"))
         self.success_window_seconds = int(os.getenv("POW_SUCCESS_WINDOW_SECONDS", "600"))
         self.challenge_ttl_seconds = int(os.getenv("POW_CHALLENGE_TTL_SECONDS", "90"))
         self.base_target_bits = int(os.getenv("POW_BASE_TARGET_BITS", "13"))
@@ -36,6 +37,7 @@ class AppSettings:
     def _validate(self) -> None:
         positive_values = {
             "POW_REQUESTS_PER_TIER": self.requests_per_tier,
+            "POW_SOURCE_REQUESTS_PER_TIER": self.source_requests_per_tier,
             "POW_SUCCESS_WINDOW_SECONDS": self.success_window_seconds,
             "POW_CHALLENGE_TTL_SECONDS": self.challenge_ttl_seconds,
             "POW_BASE_TARGET_BITS": self.base_target_bits,

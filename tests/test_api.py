@@ -249,6 +249,55 @@ def test_old_expired_challenges_are_eventually_purged() -> None:
         assert app.state.container.challenge_store.get(challenge["challengeId"]) is None
 
 
+
+
+def test_cookie_rotation_from_same_ip_inherits_elevated_source_tier() -> None:
+    with temporary_env(POW_SOURCE_REQUESTS_PER_TIER="5", POW_REQUESTS_PER_TIER="10"):
+        app = create_app()
+        first_client = TestClient(app)
+        for _ in range(5):
+            challenge = issue_challenge(first_client, 1)
+            result = submit_proof(first_client, challenge, 1)
+            assert result.status_code == 200
+
+        rotated_client = TestClient(app)
+        elevated = issue_challenge(rotated_client, 1)
+        assert elevated["tier"] == 1
+        assert len(elevated["algorithm"]["stages"]) == 2
+
+
+def test_new_session_from_different_ip_does_not_inherit_prior_source_tier() -> None:
+    with temporary_env(POW_SOURCE_REQUESTS_PER_TIER="5", POW_REQUESTS_PER_TIER="10", POW_TRUSTED_PROXY_IPS="testclient"):
+        app = create_app()
+        first_client = TestClient(app)
+        for _ in range(5):
+            challenge = first_client.post(
+                "/v1/pow/challenges",
+                json={"resource": "random-numbers", "count": 1},
+                headers={"x-forwarded-for": "198.51.100.10"},
+            )
+            assert challenge.status_code == 200
+            solved = solve_challenge(challenge.json())
+            result = first_client.post(
+                "/v1/random-numbers",
+                json={
+                    "count": 1,
+                    "challengeId": challenge.json()["challengeId"],
+                    "proof": {"nonces": solved},
+                },
+                headers={"x-forwarded-for": "198.51.100.10"},
+            )
+            assert result.status_code == 200
+
+        second_client = TestClient(app)
+        fresh = second_client.post(
+            "/v1/pow/challenges",
+            json={"resource": "random-numbers", "count": 1},
+            headers={"x-forwarded-for": "198.51.100.11"},
+        )
+        assert fresh.status_code == 200
+        assert fresh.json()["tier"] == 0
+
 def test_telemetry_endpoint_reports_counters() -> None:
     client = TestClient(create_app())
     challenge = issue_challenge(client, 1)
@@ -260,3 +309,4 @@ def test_telemetry_endpoint_reports_counters() -> None:
     assert counters["sessions.created"] >= 1
     assert counters["challenges.issued"] >= 1
     assert counters["protected.success"] >= 1
+

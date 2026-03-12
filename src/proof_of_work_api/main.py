@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
             "minCount": settings.min_random_count,
             "maxCount": settings.max_random_count,
             "requestsPerTier": settings.requests_per_tier,
+            "sourceRequestsPerTier": settings.source_requests_per_tier,
             "successWindowSeconds": settings.success_window_seconds,
             "maxOutstandingChallenges": settings.max_outstanding_challenges,
             "sessionCookieName": settings.session_cookie_name,
@@ -105,13 +106,15 @@ def create_app() -> FastAPI:
     @app.post("/v1/random-numbers")
     async def random_numbers(request: RandomNumbersRequest, http_request: Request) -> dict:
         current_time = datetime.now(timezone.utc)
+        source_key = container.client_ip_resolver.resolve(http_request)
         session_id = http_request.cookies.get(settings.session_cookie_name)
         session = container.session_store.get_required(session_id, current_time)
         if session is None:
             raise ApiError(401, "SESSION_REQUIRED", "A valid server-issued session is required.")
-        verification = container.proof_verifier.verify_and_consume(request, session.session_id)
+        verification = container.proof_verifier.verify_and_consume(request, session.session_id, source_key)
         completed_at = datetime.now(timezone.utc)
-        container.success_tracker.record(session.session_id, completed_at)
+        container.session_success_tracker.record(session.session_id, completed_at)
+        container.source_success_tracker.record(source_key, completed_at)
         container.telemetry_service.increment("protected.success")
         container.telemetry_service.increment(f"protected.success.tier.{verification['tier']}")
         numbers = container.random_number_service.generate(verification["count"])
@@ -123,6 +126,7 @@ def create_app() -> FastAPI:
                 "stages": verification["stages"],
                 "challengeId": verification["challengeId"],
                 "sessionId": verification["sessionId"],
+                "sourceKey": verification["sourceKey"],
                 "completedAt": completed_at.isoformat(),
             },
         }

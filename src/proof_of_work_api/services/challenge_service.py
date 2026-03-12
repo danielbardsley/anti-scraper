@@ -21,14 +21,16 @@ class ChallengeService:
         settings: AppSettings,
         challenge_store: ChallengeStore,
         difficulty_policy: DifficultyPolicy,
-        success_tracker: SlidingWindowTracker,
+        session_success_tracker: SlidingWindowTracker,
+        source_success_tracker: SlidingWindowTracker,
         request_canonicalizer: RequestCanonicalizer,
         rate_limiter: ChallengeRateLimiter,
     ) -> None:
         self._settings = settings
         self._challenge_store = challenge_store
         self._difficulty_policy = difficulty_policy
-        self._success_tracker = success_tracker
+        self._session_success_tracker = session_success_tracker
+        self._source_success_tracker = source_success_tracker
         self._request_canonicalizer = request_canonicalizer
         self._rate_limiter = rate_limiter
 
@@ -42,8 +44,12 @@ class ChallengeService:
         issued_at = datetime.now(timezone.utc)
         self._rate_limiter.enforce_and_record(issued_ip, session_id, issued_at)
 
-        recent_successes = self._success_tracker.count(session_id, issued_at)
-        tier, stage_target_bits = self._difficulty_policy.build_for_recent_successes(recent_successes)
+        recent_session_successes = self._session_success_tracker.count(session_id, issued_at)
+        recent_source_successes = self._source_success_tracker.count(issued_ip, issued_at)
+        tier, stage_target_bits = self._difficulty_policy.build_for_session_and_source_successes(
+            recent_session_successes,
+            recent_source_successes,
+        )
 
         challenge_id = uuid.uuid4().hex
         request_hash = self._request_canonicalizer.hash_random_numbers_request(count)
@@ -89,6 +95,9 @@ class ChallengeService:
             "seed": seed,
             "session": {
                 "outstandingChallenges": outstanding_after_save,
+            },
+            "source": {
+                "recentSuccesses": recent_source_successes,
             },
         }
 
