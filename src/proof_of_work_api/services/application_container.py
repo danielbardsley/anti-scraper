@@ -17,7 +17,7 @@ from proof_of_work_api.services.telemetry_service import TelemetryService
 class ApplicationContainer:
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
-        self.challenge_store = ChallengeStore()
+        self.challenge_store = ChallengeStore(settings)
         self.session_store = SessionStore(settings)
         self.request_canonicalizer = RequestCanonicalizer()
         self.success_tracker = SlidingWindowTracker(settings.success_window_seconds)

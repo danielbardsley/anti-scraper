@@ -40,11 +40,7 @@ class ChallengeService:
         self._validate_count(count)
 
         issued_at = datetime.now(timezone.utc)
-        self._rate_limiter.enforce(issued_ip, session_id, issued_at)
-
-        outstanding = self._challenge_store.count_outstanding(session_id, issued_at)
-        if outstanding >= self._settings.max_outstanding_challenges:
-            raise ApiError(429, "TOO_MANY_OUTSTANDING_CHALLENGES", "Session has too many outstanding challenges.")
+        self._rate_limiter.enforce_and_record(issued_ip, session_id, issued_at)
 
         recent_successes = self._success_tracker.count(session_id, issued_at)
         tier, stage_target_bits = self._difficulty_policy.build_for_recent_successes(recent_successes)
@@ -66,8 +62,14 @@ class ChallengeService:
             expires_at=expires_at,
             issued_ip=issued_ip,
         )
-        self._challenge_store.save(record)
-        self._rate_limiter.record(issued_ip, session_id, issued_at)
+        try:
+            outstanding_after_save = self._challenge_store.save_if_outstanding_below_limit(
+                record,
+                self._settings.max_outstanding_challenges,
+                issued_at,
+            )
+        except ValueError as error:
+            raise ApiError(429, "TOO_MANY_OUTSTANDING_CHALLENGES", "Session has too many outstanding challenges.") from error
 
         return {
             "challengeId": challenge_id,
@@ -86,7 +88,7 @@ class ChallengeService:
             },
             "seed": seed,
             "session": {
-                "outstandingChallenges": outstanding + 1,
+                "outstandingChallenges": outstanding_after_save,
             },
         }
 

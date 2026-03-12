@@ -25,6 +25,21 @@ class SlidingWindowTracker:
             self._trim(queue, normalized)
             queue.append(normalized)
 
+    def check_and_record_if_below_limit(self, key: str, limit: int, current_time: datetime) -> None:
+        normalized = current_time.astimezone(timezone.utc)
+        with self._lock:
+            queue = self._events[key]
+            self._trim(queue, normalized)
+            if len(queue) >= limit:
+                raise ValueError("limit exceeded")
+            queue.append(normalized)
+
+    def rollback_last(self, key: str) -> None:
+        with self._lock:
+            queue = self._events.get(key)
+            if queue:
+                queue.pop()
+
     def _trim(self, queue: deque[datetime], reference_time: datetime) -> None:
         threshold = reference_time - timedelta(seconds=self._window_seconds)
         while queue and queue[0] <= threshold:

@@ -22,6 +22,7 @@ class AppSettings:
         self.session_challenge_limit = int(os.getenv("POW_SESSION_CHALLENGE_LIMIT", "30"))
         self.challenge_rate_window_seconds = int(os.getenv("POW_CHALLENGE_RATE_WINDOW_SECONDS", "600"))
         self.max_outstanding_challenges = int(os.getenv("POW_MAX_OUTSTANDING_CHALLENGES", "2"))
+        self.expired_challenge_retention_seconds = int(os.getenv("POW_EXPIRED_CHALLENGE_RETENTION_SECONDS", "300"))
         self.session_cookie_name = os.getenv("POW_SESSION_COOKIE_NAME", "pow_session")
         self.secure_cookie = os.getenv("POW_SECURE_COOKIE", "false").lower() == "true"
         self.trusted_proxy_ips = {
@@ -44,6 +45,7 @@ class AppSettings:
             "POW_SESSION_CHALLENGE_LIMIT": self.session_challenge_limit,
             "POW_CHALLENGE_RATE_WINDOW_SECONDS": self.challenge_rate_window_seconds,
             "POW_MAX_OUTSTANDING_CHALLENGES": self.max_outstanding_challenges,
+            "POW_EXPIRED_CHALLENGE_RETENTION_SECONDS": self.expired_challenge_retention_seconds,
         }
         for name, value in positive_values.items():
             if value <= 0:

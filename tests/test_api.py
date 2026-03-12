@@ -194,6 +194,61 @@ def test_ip_challenge_rate_limit_is_enforced() -> None:
         assert second.json()["error"]["code"] == "IP_CHALLENGE_RATE_LIMITED"
 
 
+def test_session_challenge_rate_limit_is_enforced() -> None:
+    with temporary_env(POW_SESSION_CHALLENGE_LIMIT="1", POW_IP_CHALLENGE_LIMIT="10", POW_MAX_OUTSTANDING_CHALLENGES="10"):
+        client = TestClient(create_app())
+        first = client.post("/v1/pow/challenges", json={"resource": "random-numbers", "count": 1})
+        second = client.post("/v1/pow/challenges", json={"resource": "random-numbers", "count": 1})
+        assert first.status_code == 200
+        assert second.status_code == 429
+        assert second.json()["error"]["code"] == "SESSION_CHALLENGE_RATE_LIMITED"
+
+
+def test_trusted_proxy_header_is_used_only_for_trusted_proxy() -> None:
+    with temporary_env(POW_IP_CHALLENGE_LIMIT="1", POW_MAX_OUTSTANDING_CHALLENGES="10", POW_TRUSTED_PROXY_IPS="testclient"):
+        client = TestClient(create_app())
+        first = client.post(
+            "/v1/pow/challenges",
+            json={"resource": "random-numbers", "count": 1},
+            headers={"x-forwarded-for": "198.51.100.10"},
+        )
+        second = client.post(
+            "/v1/pow/challenges",
+            json={"resource": "random-numbers", "count": 1},
+            headers={"x-forwarded-for": "198.51.100.11"},
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+
+    with temporary_env(POW_IP_CHALLENGE_LIMIT="1", POW_MAX_OUTSTANDING_CHALLENGES="10"):
+        client = TestClient(create_app())
+        first = client.post(
+            "/v1/pow/challenges",
+            json={"resource": "random-numbers", "count": 1},
+            headers={"x-forwarded-for": "198.51.100.10"},
+        )
+        second = client.post(
+            "/v1/pow/challenges",
+            json={"resource": "random-numbers", "count": 1},
+            headers={"x-forwarded-for": "198.51.100.11"},
+        )
+        assert first.status_code == 200
+        assert second.status_code == 429
+        assert second.json()["error"]["code"] == "IP_CHALLENGE_RATE_LIMITED"
+
+
+def test_old_expired_challenges_are_eventually_purged() -> None:
+    with temporary_env(POW_EXPIRED_CHALLENGE_RETENTION_SECONDS="1"):
+        app = create_app()
+        client = TestClient(app)
+        challenge = issue_challenge(client, 1)
+        record = app.state.container.challenge_store.get(challenge["challengeId"])
+        assert record is not None
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        client.post("/v1/pow/challenges", json={"resource": "random-numbers", "count": 1})
+        assert app.state.container.challenge_store.get(challenge["challengeId"]) is None
+
+
 def test_telemetry_endpoint_reports_counters() -> None:
     client = TestClient(create_app())
     challenge = issue_challenge(client, 1)
