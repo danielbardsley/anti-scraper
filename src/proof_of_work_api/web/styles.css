@@ -115,3 +115,22 @@ pre {
   min-height: 180px;
   overflow: auto;
 }
+
+
+.hero-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hero-link {
+  color: #38bdf8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.hero-link:hover {
+  text-decoration: underline;
+}
