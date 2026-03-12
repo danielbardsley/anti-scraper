@@ -6,3 +6,5 @@ __pycache__/
 htmlcov/
 *.egg-info/
 .keys/
+tmp/
+artifacts/reports/

@@ -65,10 +65,13 @@ class ScenarioFactory:
                 session_file=session_file,
                 request_count=request_count,
                 iteration_count=max(iteration_count, 12),
-                worker_count=worker_count or 1,
+                worker_count=1,
                 max_requests=max_requests,
                 max_duration_seconds=max_duration_seconds,
                 authorized_acknowledged=authorized_acknowledged,
+                stale_success_target=10,
+                stale_issue_retry_limit=5,
+                stale_retry_sleep_seconds=0.25,
             )
         if name is ScenarioName.EXPIRY_EDGE:
             return ScenarioDefinition(

@@ -137,11 +137,46 @@ class RunController:
             stockpiled_payload = stockpiled_result.payload
             stockpiled_solution = self._solver.solve(stockpiled_payload)
             collector.record_solver(stockpiled_solution)
-            for _ in range(max(10, scenario.iteration_count - 2)):
+
+            successful_spends = 0
+            issue_retries = 0
+            while successful_spends < scenario.stale_success_target:
                 stop_reason = self._evaluate_stop_reason(collector, started_at, scenario)
                 if stop_reason is not None:
                     return collector.build_summary(perf_counter() - started_at, stop_reason.value)
-                self._execute_single_fetch_solve_submit(collector, client, target, scenario.request_count)
+
+                challenge_result = self._request_challenge(collector, client, target, scenario.request_count)
+                if challenge_result.bucket == ErrorBucket.SUCCESS and challenge_result.payload is not None:
+                    issue_retries = 0
+                    solver_result = self._solver.solve(challenge_result.payload)
+                    collector.record_solver(solver_result)
+                    submit_result = self._protected_endpoint_client.submit_proof(
+                        client=client,
+                        target=target,
+                        request_body={
+                            "count": scenario.request_count,
+                            "challengeId": challenge_result.payload["challengeId"],
+                            "proof": {"nonces": solver_result.nonces},
+                        },
+                    )
+                    collector.record_submission(submit_result)
+                    if submit_result.bucket == ErrorBucket.SUCCESS:
+                        successful_spends += 1
+                    continue
+
+                if challenge_result.bucket in {
+                    ErrorBucket.IP_CHALLENGE_RATE_LIMITED,
+                    ErrorBucket.SESSION_CHALLENGE_RATE_LIMITED,
+                    ErrorBucket.TOO_MANY_OUTSTANDING_CHALLENGES,
+                }:
+                    issue_retries += 1
+                    if issue_retries > scenario.stale_issue_retry_limit:
+                        return collector.build_summary(perf_counter() - started_at, ScenarioStopReason.ITERATION_TARGET_REACHED.value)
+                    sleep(scenario.stale_retry_sleep_seconds)
+                    continue
+
+                return collector.build_summary(perf_counter() - started_at, ScenarioStopReason.ITERATION_TARGET_REACHED.value)
+
             stale_submit = self._protected_endpoint_client.submit_proof(
                 client=client,
                 target=target,
