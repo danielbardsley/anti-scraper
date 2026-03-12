@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from proof_of_work_api.config.app_settings import AppSettings
@@ -18,11 +18,11 @@ def create_app() -> FastAPI:
     settings = AppSettings()
     container = ApplicationContainer(settings)
 
-    app = FastAPI(title="Proof-of-Work Demo", version="0.2.0")
-    app.state.container = container
-    app.mount("/static", StaticFiles(directory=settings.web_root), name="static")
+    inner_app = FastAPI(title="Proof-of-Work Demo", version="0.2.0")
+    inner_app.state.container = container
+    inner_app.mount("/static", StaticFiles(directory=settings.web_root), name="static")
 
-    @app.exception_handler(ApiError)
+    @inner_app.exception_handler(ApiError)
     async def api_error_handler(_: Request, error: ApiError) -> JSONResponse:
         container.telemetry_service.increment(f"errors.{error.code}")
         return JSONResponse(
@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.exception_handler(RequestValidationError)
+    @inner_app.exception_handler(RequestValidationError)
     async def validation_error_handler(_: Request, error: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=400,
@@ -49,18 +49,20 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.get("/")
-    async def index() -> FileResponse:
-        return FileResponse(settings.web_root / "index.html")
+    @inner_app.get("/", response_class=HTMLResponse)
+    async def index() -> HTMLResponse:
+        html = (settings.web_root / "index.html").read_text(encoding="utf-8")
+        html = html.replace("__BASE_PATH__", settings.base_path)
+        return HTMLResponse(html)
 
-    @app.get("/healthz")
+    @inner_app.get("/healthz")
     async def healthz() -> dict:
         return {
             "status": "ok",
             "serverTime": datetime.now(timezone.utc).isoformat(),
         }
 
-    @app.get("/v1/config")
+    @inner_app.get("/v1/config")
     async def config() -> dict:
         return {
             "defaultCount": settings.default_random_count,
@@ -71,15 +73,16 @@ def create_app() -> FastAPI:
             "successWindowSeconds": settings.success_window_seconds,
             "maxOutstandingChallenges": settings.max_outstanding_challenges,
             "sessionCookieName": settings.session_cookie_name,
+            "basePath": settings.base_path,
         }
 
-    @app.get("/v1/telemetry")
+    @inner_app.get("/v1/telemetry")
     async def telemetry() -> dict:
         return {
             "counters": container.telemetry_service.snapshot(),
         }
 
-    @app.post("/v1/pow/challenges")
+    @inner_app.post("/v1/pow/challenges")
     async def issue_challenge(request: ChallengeIssueRequest, http_request: Request, http_response: Response) -> dict:
         current_time = datetime.now(timezone.utc)
         issued_ip = container.client_ip_resolver.resolve(http_request)
@@ -103,7 +106,7 @@ def create_app() -> FastAPI:
         container.telemetry_service.increment(f"challenges.issued.session.{session.session_id}")
         return challenge
 
-    @app.post("/v1/random-numbers")
+    @inner_app.post("/v1/random-numbers")
     async def random_numbers(request: RandomNumbersRequest, http_request: Request) -> dict:
         current_time = datetime.now(timezone.utc)
         source_key = container.client_ip_resolver.resolve(http_request)
@@ -131,4 +134,8 @@ def create_app() -> FastAPI:
             },
         }
 
-    return app
+    if settings.base_path:
+        outer_app = FastAPI(title="Proof-of-Work Demo", version="0.2.0")
+        outer_app.mount(settings.base_path, inner_app)
+        return outer_app
+    return inner_app

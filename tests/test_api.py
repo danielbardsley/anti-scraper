@@ -310,3 +310,33 @@ def test_telemetry_endpoint_reports_counters() -> None:
     assert counters["challenges.issued"] >= 1
     assert counters["protected.success"] >= 1
 
+
+
+def test_subpath_mode_serves_html_and_config() -> None:
+    with temporary_env(POW_BASE_PATH="/proof-of-work"):
+        client = TestClient(create_app())
+        response = client.get("/proof-of-work/")
+        assert response.status_code == 200
+        assert 'window.APP_BASE_PATH = "/proof-of-work"' in response.text
+        assert '/proof-of-work/static/styles.css?v=3' in response.text
+        config = client.get("/proof-of-work/v1/config")
+        assert config.status_code == 200
+        assert config.json()["basePath"] == "/proof-of-work"
+
+
+def test_subpath_mode_supports_pow_flow() -> None:
+    with temporary_env(POW_BASE_PATH="/proof-of-work"):
+        client = TestClient(create_app())
+        challenge_response = client.post("/proof-of-work/v1/pow/challenges", json={"resource": "random-numbers", "count": 1})
+        assert challenge_response.status_code == 200
+        challenge = challenge_response.json()
+        response = client.post(
+            "/proof-of-work/v1/random-numbers",
+            json={
+                "count": 1,
+                "challengeId": challenge["challengeId"],
+                "proof": {"nonces": solve_challenge(challenge)},
+            },
+        )
+        assert response.status_code == 200
+        assert len(response.json()["numbers"]) == 1

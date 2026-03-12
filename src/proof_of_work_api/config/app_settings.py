@@ -26,6 +26,7 @@ class AppSettings:
         self.expired_challenge_retention_seconds = int(os.getenv("POW_EXPIRED_CHALLENGE_RETENTION_SECONDS", "300"))
         self.session_cookie_name = os.getenv("POW_SESSION_COOKIE_NAME", "pow_session")
         self.secure_cookie = os.getenv("POW_SECURE_COOKIE", "false").lower() == "true"
+        self.base_path = self._normalize_base_path(os.getenv("POW_BASE_PATH", ""))
         self.trusted_proxy_ips = {
             value.strip() for value in os.getenv("POW_TRUSTED_PROXY_IPS", "").split(",") if value.strip()
         }
@@ -33,6 +34,14 @@ class AppSettings:
         self.project_root = Path(__file__).resolve().parents[3]
         self.web_root = self.project_root / "src" / "proof_of_work_api" / "web"
         self._validate()
+
+    def _normalize_base_path(self, value: str) -> str:
+        cleaned = value.strip()
+        if cleaned in {"", "/"}:
+            return ""
+        if not cleaned.startswith("/"):
+            cleaned = f"/{cleaned}"
+        return cleaned.rstrip("/")
 
     def _validate(self) -> None:
         positive_values = {

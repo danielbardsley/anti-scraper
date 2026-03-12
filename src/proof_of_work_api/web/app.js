@@ -19,12 +19,17 @@ const sha256Constants = [
   0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 ];
 let requestCounter = 0;
+const APP_BASE_PATH = window.APP_BASE_PATH || "";
 
 initializeUi().catch((error) => updateStatus(`Failed to initialize UI: ${error.message}`, true));
 fetchButton.addEventListener("click", () => runRequest().catch((error) => handleFailure(error)));
 
+function buildAppUrl(path) {
+  return `${APP_BASE_PATH}${path}`;
+}
+
 async function initializeUi() {
-  const config = await fetchJson("/v1/config");
+  const config = await fetchJson(buildAppUrl("/v1/config"));
   countInput.min = String(config.minCount);
   countInput.max = String(config.maxCount);
   countInput.value = String(config.defaultCount);
@@ -41,7 +46,7 @@ async function runRequest() {
   responseOutputNode.textContent = "No response yet.";
 
   const count = Number.parseInt(countInput.value, 10);
-  const challenge = await fetchJson("/v1/pow/challenges", {
+  const challenge = await fetchJson(buildAppUrl("/v1/pow/challenges"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resource: "random-numbers", count })
@@ -57,7 +62,7 @@ async function runRequest() {
   solveTimeNode.textContent = `${(performance.now() - solveStarted).toFixed(0)} ms`;
 
   updateStatus("Submitting proof and requesting random numbers...");
-  const response = await fetchJson("/v1/random-numbers", {
+  const response = await fetchJson(buildAppUrl("/v1/random-numbers"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
