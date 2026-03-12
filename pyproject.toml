@@ -24,3 +24,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[project.scripts]
+pow-harness = "pow_harness.__main__:main"
