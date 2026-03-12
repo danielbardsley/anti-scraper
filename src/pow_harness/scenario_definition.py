@@ -15,3 +15,5 @@ class ScenarioDefinition:
     max_duration_seconds: float
     authorized_acknowledged: bool
     high_pressure_mode: bool = False
+    challenge_burst_size: int = 1
+    expiry_submit_margin_seconds: float = 0.2

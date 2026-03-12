@@ -56,6 +56,7 @@ class ScenarioFactory:
                 max_duration_seconds=max_duration_seconds,
                 authorized_acknowledged=authorized_acknowledged,
                 high_pressure_mode=True,
+                challenge_burst_size=max(3, request_count),
             )
         if name is ScenarioName.STALE_CHALLENGE_SPEND:
             return ScenarioDefinition(
@@ -80,6 +81,7 @@ class ScenarioFactory:
                 max_requests=max_requests,
                 max_duration_seconds=max_duration_seconds,
                 authorized_acknowledged=authorized_acknowledged,
+                expiry_submit_margin_seconds=0.05,
             )
         raise ValueError(f"Unsupported scenario: {scenario_name}")
 
